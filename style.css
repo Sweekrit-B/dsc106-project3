@@ -47,7 +47,7 @@
 
 	.toolbar {
 		display: grid;
-		grid-template-columns: auto auto auto 1fr auto;
+		grid-template-columns: auto auto auto auto 1fr auto;
 		gap: 0.75rem;
 		align-items: center;
 		margin-bottom: 1rem;
@@ -62,6 +62,16 @@
 
 	.control input {
 		width: 96px;
+		padding: 0.5rem 0.55rem;
+		border: 1px solid #cfc7ba;
+		border-radius: 8px;
+		font: inherit;
+		color: var(--ink);
+		background: #fff;
+	}
+
+	.control select {
+		width: 160px;
 		padding: 0.5rem 0.55rem;
 		border: 1px solid #cfc7ba;
 		border-radius: 8px;
@@ -161,6 +171,19 @@
 	}
 
 	@media (max-width: 1020px) {
+		.toolbar {
+			grid-template-columns: 1fr;
+		}
+
+		.control input,
+		.control select {
+			width: 100%;
+		}
+
+		#year-label {
+			text-align: left;
+		}
+
 		.map-grid {
 			grid-template-columns: 1fr;
 		}

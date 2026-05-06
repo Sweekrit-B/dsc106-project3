@@ -7,10 +7,20 @@ const WORLD_GEOJSON_URL = "https://raw.githubusercontent.com/holtzy/D3-graph-gal
 const DATASET_IDS = { SSP245: 63724, SSP370: 61597, SSP585: 63261 };
 const OCEAN_COLOR = "#8ecae6";
 const YEAR_AGG = 5;
+const VIEWPORT_PRESETS = {
+	global: { label: "Global", lonMin: -180, lonMax: 180, latMin: -90, latMax: 90 },
+	"south-america": { label: "South America", lonMin: -90, lonMax: -30, latMin: -60, latMax: 15 },
+	"north-america": { label: "North America", lonMin: -170, lonMax: -50, latMin: 5, latMax: 80 },
+	europe: { label: "Europe", lonMin: -25, lonMax: 45, latMin: 30, latMax: 72 },
+	africa: { label: "Africa", lonMin: -20, lonMax: 55, latMin: -35, latMax: 38 },
+	asia: { label: "Asia", lonMin: 25, lonMax: 180, latMin: -10, latMax: 80 },
+	oceania: { label: "Oceania", lonMin: 90, lonMax: 180, latMin: -50, latMax: 10 },
+};
 
 const loadButton = document.querySelector("#load-button");
 const coarsenInput = document.querySelector("#coarsen-input");
 const yearAggInput = document.querySelector("#year-agg-input");
+const viewportSelect = document.querySelector("#viewport-select");
 const statusEl = document.querySelector("#status");
 const sliderEl = document.querySelector("#year-slider");
 const yearLabelEl = document.querySelector("#year-label");
@@ -32,6 +42,7 @@ let catalogRows = null;
 let worldGeoJson = null;
 let state = null;
 let currentRequestId = 0;
+let currentViewportKey = viewportSelect.value;
 
 function setStatus(message, type = "") {
 	statusEl.textContent = message;
@@ -89,15 +100,33 @@ function downsampleCoords(coord, factor) {
 	return out;
 }
 
-function normalizeLonForGeoJson(lon) {
+function normalizeLon(lon) {
 	return lon > 180 ? lon - 360 : lon;
+}
+
+function getViewport(viewportKey) {
+	return VIEWPORT_PRESETS[viewportKey] || VIEWPORT_PRESETS.global;
+}
+
+function estimateCoordStep(coords) {
+	if (!coords || coords.length < 2) return 1;
+	let sum = 0;
+	let count = 0;
+	for (let i = 1; i < coords.length; i += 1) {
+		const diff = Math.abs(Number(coords[i]) - Number(coords[i - 1]));
+		if (Number.isFinite(diff) && diff > 0) {
+			sum += diff;
+			count += 1;
+		}
+	}
+	return count ? sum / count : 1;
 }
 
 function buildLandMask(lons, lats, world) {
 	const mask = new Uint8Array(lons.length * lats.length);
 	for (let y = 0; y < lats.length; y += 1) {
 		for (let x = 0; x < lons.length; x += 1) {
-			mask[y * lons.length + x] = d3.geoContains(world, [normalizeLonForGeoJson(Number(lons[x])), Number(lats[y])]) ? 1 : 0;
+			mask[y * lons.length + x] = d3.geoContains(world, [normalizeLon(Number(lons[x])), Number(lats[y])]) ? 1 : 0;
 		}
 	}
 	return mask;
@@ -165,7 +194,7 @@ function computeVmaxQuantile(allScenarioFrames, q = 0.99) {
 }
 
 function createColorScale(vmax) {
-	return d3.scaleSequential(d3.interpolateBrBG).domain([-vmax, vmax]);
+	return d3.scaleSequential(d3.interpolateRdYlGn).domain([-vmax, vmax]);
 }
 
 function syncCanvasSize(canvas) {
@@ -180,13 +209,17 @@ function syncCanvasSize(canvas) {
 	return { width: rect.width, height: rect.height };
 }
 
-function drawHeatmap(canvas, frame, data, colorScale) {
-	const { dims, landMask } = data;
+function drawHeatmap(canvas, frame, data, colorScale, viewport) {
+	const { dims, landMask, coordSteps } = data;
+	const lons = data.lons;
+	const lats = data.lats;
 	const { nLat, nLon } = dims;
 	const ctx = canvas.getContext("2d", { alpha: false });
 	const { width, height } = syncCanvasSize(canvas);
-	const cellWidth = width / nLon;
-	const cellHeight = height / nLat;
+	const lonSpan = viewport.lonMax - viewport.lonMin;
+	const latSpan = viewport.latMax - viewport.latMin;
+	const cellWidth = (width * coordSteps.lon) / lonSpan;
+	const cellHeight = (height * coordSteps.lat) / latSpan;
 
 	ctx.setTransform(1, 0, 0, 1, 0, 0);
 	ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -196,12 +229,18 @@ function drawHeatmap(canvas, frame, data, colorScale) {
 	ctx.fillRect(0, 0, width, height);
 
 	for (let y = 0; y < nLat; y += 1) {
+		const lat = Number(lats[y]);
+		if (lat < viewport.latMin - coordSteps.lat / 2 || lat > viewport.latMax + coordSteps.lat / 2) continue;
+		const yCenter = ((viewport.latMax - lat) / latSpan) * height;
 		for (let x = 0; x < nLon; x += 1) {
+			const lon = Number(lons[x]);
+			if (lon < viewport.lonMin - coordSteps.lon / 2 || lon > viewport.lonMax + coordSteps.lon / 2) continue;
+			const xCenter = ((lon - viewport.lonMin) / lonSpan) * width;
 			if (!landMask[y * nLon + x]) continue;
 			const v = frame[y * nLon + x];
 			if (!Number.isFinite(v)) continue;
 			ctx.fillStyle = colorScale(v);
-			ctx.fillRect(Math.floor(x * cellWidth), Math.floor((nLat - 1 - y) * cellHeight), Math.ceil(cellWidth) + 1, Math.ceil(cellHeight) + 1);
+			ctx.fillRect(Math.floor(xCenter - cellWidth / 2), Math.floor(yCenter - cellHeight / 2), Math.ceil(cellWidth) + 1, Math.ceil(cellHeight) + 1);
 		}
 	}
 }
@@ -230,11 +269,30 @@ function attachTooltipHandlers(scenario) {
 	canvas.addEventListener("mousemove", (evt) => {
 		if (!state) return;
 		const item = state.processed[scenario];
+		const viewport = state.viewport;
 		const rect = canvas.getBoundingClientRect();
 		const x = evt.clientX - rect.left;
 		const y = evt.clientY - rect.top;
-		const iLon = Math.floor((x / rect.width) * item.dims.nLon);
-		const iLat = item.dims.nLat - 1 - Math.floor((y / rect.height) * item.dims.nLat);
+		const lon = viewport.lonMin + (x / rect.width) * (viewport.lonMax - viewport.lonMin);
+		const lat = viewport.latMax - (y / rect.height) * (viewport.latMax - viewport.latMin);
+		let iLon = 0;
+		let lonDiff = Infinity;
+		for (let ix = 0; ix < item.lons.length; ix += 1) {
+			const diff = Math.abs(Number(item.lons[ix]) - lon);
+			if (diff < lonDiff) {
+				lonDiff = diff;
+				iLon = ix;
+			}
+		}
+		let iLat = 0;
+		let latDiff = Infinity;
+		for (let iy = 0; iy < item.lats.length; iy += 1) {
+			const diff = Math.abs(Number(item.lats[iy]) - lat);
+			if (diff < latDiff) {
+				latDiff = diff;
+				iLat = iy;
+			}
+		}
 		if (iLon < 0 || iLon >= item.dims.nLon || iLat < 0 || iLat >= item.dims.nLat) {
 			tooltip.style.opacity = "0";
 			return;
@@ -243,7 +301,7 @@ function attachTooltipHandlers(scenario) {
 		tooltip.style.opacity = "1";
 		tooltip.style.left = `${x}px`;
 		tooltip.style.top = `${y}px`;
-		tooltip.textContent = `Year ${state.years[state.frameIndex]} | Lat ${item.lats[iLat].toFixed(2)} | Lon ${item.lons[iLon].toFixed(2)} | ${Number.isFinite(value) ? value.toFixed(3) : "NaN"}`;
+		tooltip.textContent = `Year ${state.years[state.frameIndex]} | Lat ${Number(item.lats[iLat]).toFixed(2)} | Lon ${Number(item.lons[iLon]).toFixed(2)} | ${Number.isFinite(value) ? value.toFixed(3) : "NaN"}`;
 	});
 	canvas.addEventListener("mouseleave", () => {
 		tooltip.style.opacity = "0";
@@ -301,17 +359,35 @@ async function loadCvegFromGroup(group, coarsenFactor, yearAgg) {
 
 	const years = decodeYears(time.data, timeNode.attrs?.units);
 	const raw = compute5YearRaw(coarsened, years, nLat, nLon, yearAgg);
-	return { rawFrames: raw.yearly, years: raw.yearlyYears, lats: downsampleCoords(lat.data, coarsenFactor), lons: downsampleCoords(lon.data, coarsenFactor), dims: { nLat, nLon } };
+	const lats = Array.from(downsampleCoords(lat.data, coarsenFactor));
+	const lonRaw = downsampleCoords(lon.data, coarsenFactor);
+	return {
+		rawFrames: raw.yearly,
+		years: raw.yearlyYears,
+		lats,
+		lons: Array.from(lonRaw, normalizeLon),
+		coordSteps: { lat: estimateCoordStep(lats), lon: estimateCoordStep(lonRaw) },
+		dims: { nLat, nLon },
+	};
 }
 
 function renderFrame(frameIndex) {
 	if (!state) return;
 	state.frameIndex = frameIndex;
 	yearLabelEl.textContent = `Year: ${state.years[frameIndex]}`;
+	const viewport = state.viewport;
 	for (const scenario of Object.keys(DATASET_IDS)) {
 		const item = state.processed[scenario];
-		drawHeatmap(canvases[scenario], item.anomFrames[frameIndex], item, state.colorScale);
+		drawHeatmap(canvases[scenario], item.anomFrames[frameIndex], item, state.colorScale, viewport);
 	}
+}
+
+function applyViewportSelection() {
+	currentViewportKey = viewportSelect.value;
+	if (!state) return;
+	state.viewportKey = currentViewportKey;
+	state.viewport = getViewport(currentViewportKey);
+	renderFrame(state.frameIndex);
 }
 
 async function loadAndCompute() {
@@ -336,7 +412,7 @@ async function loadAndCompute() {
 	const years = processed.SSP245.years;
 	const vmax = computeVmaxQuantile({ SSP245: processed.SSP245.anomFrames, SSP370: processed.SSP370.anomFrames, SSP585: processed.SSP585.anomFrames });
 	const colorScale = createColorScale(vmax);
-	state = { years, processed, colorScale, vmax, frameIndex: 0, coarsenFactor, yearAgg };
+	state = { years, processed, colorScale, vmax, frameIndex: 0, coarsenFactor, yearAgg, viewportKey: currentViewportKey, viewport: getViewport(currentViewportKey) };
 
 	drawLegend(vmax, colorScale);
 	sliderEl.min = "0";
@@ -345,11 +421,15 @@ async function loadAndCompute() {
 	sliderEl.disabled = false;
 	for (const scenario of Object.keys(DATASET_IDS)) attachTooltipHandlers(scenario);
 	renderFrame(0);
-	setStatus(`Loaded and rendered all SSP anomaly maps with coarsening ${coarsenFactor} and ${yearAgg}-year bins.`, "status-ok");
+	setStatus(`Loaded and rendered all SSP anomaly maps with coarsening ${coarsenFactor}, ${yearAgg}-year bins, focused on ${state.viewport.label}.`, "status-ok");
 	window.cvegD3State = state;
 }
 
 sliderEl.addEventListener("input", () => renderFrame(Number(sliderEl.value)));
+viewportSelect.addEventListener("change", applyViewportSelection);
+window.addEventListener("resize", () => {
+	if (state) renderFrame(state.frameIndex);
+});
 
 loadButton.addEventListener("click", async () => {
 	loadButton.disabled = true;
