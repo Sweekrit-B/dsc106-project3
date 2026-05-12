@@ -4,46 +4,27 @@
 	<meta charset="UTF-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 	<title>Vegetation Carbon Under Climate Change</title>
-	<link rel="stylesheet" href="style.css">
+	<style>
+		@import "style.css";
+	</style>
 </head>
 <body>
 	<main class="app">
-		<h1>How Will Climate Change Affect Vegetation Carbon Storage?</h1>
+		<h1>How Do Different Climate Models Predict Changes in Global and Regional Vegetation Carbon Storage?</h1>
+		<p class="subtitle"><strong>Sweekrit Bhatnagar</strong> (sbhatnagar@ucsd.edu), <strong>Nirav Kanthed</strong> (nkanthed@ucsd.edu), and <strong>Arah Sanders</strong> (a4sanders@ucsd.edu)</p>
 		<p class="intro-text">
-			Plants absorb CO₂ from the atmosphere and store it as carbon in their biomass — a process that helps slow climate change.
-			This visualization shows how <strong>vegetation carbon mass (cVeg, kg C m⁻²)</strong> is projected to change from 2015 to 2100
-			under three CMIP6 climate scenarios, using the BCC-CSM2-MR climate model.
-			Each map shows the <em>anomaly</em>: how much carbon stored in plants has shifted compared to the 2015 baseline.
-			Use the year slider to scrub through time and compare how different emission pathways lead to different outcomes across the globe.
+			Plants absorb CO₂ from the atmosphere and store it as carbon in their biomass, a process directly related to the amount of carbon dioxide in the atmosphere and the climate conditions that they are exposed to. This visualization shows how vegetation carbon mass (measured in kilograms of carbon per square meter, kg C m⁻²) is projected to change from 2015 to 2100 under three different climate scenarios, using the BCC-CSM2-MR climate model from the CMIP6 project. Each map shows the anomaly, which represents how much carbon stored in plants has shifted compared to the 2015 baseline.
+
+			<br><br>
+			
+			This data was procured by downloading monthly vegatation biomass outputs from the CMIP6 archive by querying the data catalog for the appropriate variable (cVeg), model (BCC-CSM2-MR), and scenarios (SSP2-4.5, SSP3-7.0, SSP5-8.5). The data was then processed by calculating anomalies relative to the 2015 baseline, aggregating monthly outputs into 5-year averages, and merging neighboring 2° × 2° latitude–longitude grid cells to emphasize large-scale spatial trends.
+
+			<br><br>
+
+			Use the year slider to scrub through time and compare how different emission pathways lead to different outcomes across different regions.
 		</p>
 
-		<div class="toolbar">
-			<button id="load-button" type="button">Reload</button>
-			<label class="control" for="coarsen-input">
-				<span>Coarsening</span>
-				<input id="coarsen-input" type="number" min="1" step="1" value="2" />
-			</label>
-			<label class="control" for="year-agg-input">
-				<span>Year aggregation</span>
-				<input id="year-agg-input" type="number" min="1" step="1" value="5" />
-			</label>
-			<label class="control" for="viewport-select">
-				<span>Focus region</span>
-				<select id="viewport-select">
-					<option value="global">Global</option>
-					<option value="south-america">South America</option>
-					<option value="north-america">North America</option>
-					<option value="europe">Europe</option>
-					<option value="africa">Africa</option>
-					<option value="asia">Asia</option>
-					<option value="oceania">Oceania</option>
-				</select>
-			</label>
-			<input id="year-slider" type="range" min="0" max="0" step="1" value="0" disabled />
-			<div id="year-label">Year: --</div>
-		</div>
-		<p class="control-note"><strong>Coarsening</strong> merges neighboring grid cells to speed up rendering (higher = faster but blurrier).</p>
-		<p class="control-note"><strong>Year aggregation</strong> averages monthly data into multi-year bins — e.g., 5 means each map frame represents a 5-year mean. Change either value and click <em>Reload</em> to recompute.</p>
+		<div class="toolbar"></div>
 
 		<div id="loading-overlay">
 			<div class="spinner"></div>
@@ -51,56 +32,69 @@
 		</div>
 
 		<p id="status">Loading data…</p>
-
-		<section class="legend-wrap">
-			<svg id="legend-svg" aria-label="Shared anomaly legend"></svg>
-			<p class="legend-note">
-				<strong style="color:#1a7a4a;">Green</strong> = more carbon stored in vegetation than in 2015
-				— plants are gaining biomass and absorbing more CO₂, which is <em>beneficial</em> for the climate.
-				<strong style="color:#b22222;">Red / brown</strong> = less carbon stored than in 2015
-				— vegetation is declining or dying back, releasing stored carbon into the atmosphere, which <em>accelerates warming</em>.
-				Blue areas are ocean (no land data). Grey indicates no significant change from baseline.
+		<div class="slider-with-labels">
+			<span class="year-label year-label-start">2015</span>
+			<input id="year-slider" type="range" min="0" max="0" step="1" value="0" disabled />
+			<span class="year-label year-label-end">2100</span>
+		</div>
+		<div class="maps-wrapper">
+			<div class="maps-header">
+				<p id="maps-subtitle" class="maps-subtitle">Change in Vegetation Carbon (kg C m⁻²) Relative to 2015 in <span id="year-display">--</span>, Focusing on <select id="viewport-select" class="region-select"><option value="global">the World</option><option value="south-america">South America</option><option value="north-america">North America</option><option value="europe">Europe</option><option value="africa">Africa</option><option value="asia">Asia</option><option value="oceania">Oceania</option></select></p>
+			</div>
+			<section>
+				<section class="map-grid" id="map-grid">
+					<article data-scenario="SSP245" style="position:relative;">
+						<h2>SSP2-4.5 — Moderate Emissions</h2>
+						<p class="scenario-subtitle">Some cooperative climate policy action (current world). Temperatures projected to rise ~2–3 °C by 2100.</p>
+						<canvas class="map-canvas" id="canvas-ssp245"></canvas>
+						<svg class="brush-overlay" data-scenario="SSP245" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:auto;"></svg>
+						<div class="tooltip"></div>
+					</article>
+					<article data-scenario="SSP370" style="position:relative;">
+						<h2>SSP3-7.0 — High Emissions</h2>
+						<p class="scenario-subtitle">Limited policy action & regional fragmentation. Temperatures projected to rise ~3–4 °C by 2100.</p>
+						<canvas class="map-canvas" id="canvas-ssp370"></canvas>
+						<svg class="brush-overlay" data-scenario="SSP370" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:auto;"></svg>
+						<div class="tooltip"></div>
+					</article>
+					<article data-scenario="SSP585" style="position:relative;">
+						<h2>SSP5-8.5 — Extreme Emissions</h2>
+						<p class="scenario-subtitle">Fossil-fuel intensive & no climate change mitigation. Temperatures projected to rise ~4–5 °C by 2100.</p>
+						<canvas class="map-canvas" id="canvas-ssp585"></canvas>
+						<svg class="brush-overlay" data-scenario="SSP585" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:auto;"></svg>
+						<div class="tooltip"></div>
+					</article>
+				</section>
+				<section>
+					<svg id="legend-svg" aria-label="Shared anomaly legend"></svg>
+				</section>
+			</section>
+			<p id="map-caption" class="map-caption">
+				The maps illustrate changes in the amount of carbon stored in vegetation relative to the 2015 baseline under three different climate scenarios. <strong class="legend-green">Green</strong> regions indicate an increase in vegetation carbon storage compared to 2015, suggesting that plants are accumulating more biomass, potentially driven by elevated atmospheric carbon dioxide levels and enhanced plant growth. In contrast, <strong class="legend-red">red</strong> regions indicate a decline in vegetation carbon storage relative to 2015, suggesting vegetation loss or dieback that releases stored carbon back into the atmosphere, further amplifying global warming.
 			</p>
-		</section>
-
-		<section class="map-grid" id="map-grid">
-			<article class="map-card" data-scenario="SSP245">
-				<h2>SSP2-4.5 — Moderate Emissions</h2>
-				<p class="scenario-subtitle">Some climate policy action. Temperatures projected to rise ~2–3 °C by 2100.</p>
-				<canvas class="map-canvas" id="canvas-ssp245"></canvas>
-				<div class="tooltip"></div>
-			</article>
-			<article class="map-card" data-scenario="SSP370">
-				<h2>SSP3-7.0 — High Emissions</h2>
-				<p class="scenario-subtitle">Limited policy action, regional fragmentation. Temperatures projected to rise ~3–4 °C by 2100.</p>
-				<canvas class="map-canvas" id="canvas-ssp370"></canvas>
-				<div class="tooltip"></div>
-			</article>
-			<article class="map-card" data-scenario="SSP585">
-				<h2>SSP5-8.5 — Extreme Emissions</h2>
-				<p class="scenario-subtitle">Fossil-fuel intensive, no mitigation. Temperatures projected to rise ~4–5 °C by 2100.</p>
-				<canvas class="map-canvas" id="canvas-ssp585"></canvas>
-				<div class="tooltip"></div>
-			</article>
-		</section>
-
-		<p id="map-caption" class="map-caption">Each map shows how much vegetation carbon (cVeg) has changed compared to the 2015 baseline. Monthly model output was grouped into 5-year averages, and every 2×2 block of grid cells was merged into one — then the difference from the first time step was calculated to show the anomaly.</p>
+		</div>
 
 		<section class="timeseries-wrap">
-			<h3>Global Mean cVeg Anomaly Over Time</h3>
-			<p class="subtitle">Click the chart to jump to a year and update the maps above. Hover for per-scenario values.</p>
+			<h3 class="maps-subtitle"><span class="ts-title-text">Mean Change in Vegetation Carbon (kg C m⁻²) Relative to 2015 Until 2100, Focusing on</span>
+				<select id="ts-viewport-select" class="region-select">
+					<option value="global">the World</option>
+					<option value="south-america">South America</option>
+					<option value="north-america">North America</option>
+					<option value="europe">Europe</option>
+					<option value="africa">Africa</option>
+					<option value="asia">Asia</option>
+					<option value="oceania">Oceania</option>
+				</select>
+			</h3>
 			<div id="timeseries-container"></div>
 			<p class="chart-explanation">
-				This chart shows how the world average plant carbon changes over time for each scenario.
-				A rising line means plants across the globe are storing more carbon than they did in 2015.
-				A falling line means plants are storing less.
-				The higher the emissions scenario, the bigger the difference tends to be by 2100.
+					This chart compares the global mean vegetation carbon anomaly over time for each emissions scenario relative to the 2015 baseline. Although all scenarios initially show modest increases in vegetation carbon, their trajectories diverge later in the century as warming intensifies. Moderate warming can temporarily enhance plant growth through longer growing seasons and increased atmospheric CO₂ concentrations, but stronger warming and climate stressors — including heat extremes, drought, wildfire activity, and ecosystem degradation — can reduce the ability of vegetation to continue storing carbon. By 2100, higher-emissions pathways exhibit larger departures from the baseline and greater variability, highlighting how future climate conditions may alter the role of terrestrial ecosystems in the global carbon cycle.
 			</p>
 		</section>
 
 		<section class="writeup-section">
-			<h2>Writeup</h2>
-			<p class="writeup-placeholder">This is where the writeup will go.</p>
+			<h2 class="maps-subtitle">Writeup</h2>
+			<p class="intro-text">This is where the writeup will go.</p>
 		</section>
 	</main>
 
