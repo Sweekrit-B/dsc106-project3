@@ -19,6 +19,8 @@ const VIEWPORT_PRESETS = {
 const loadButton = document.querySelector("#load-button");
 const coarsenInput = document.querySelector("#coarsen-input");
 const yearAggInput = document.querySelector("#year-agg-input");
+const DEFAULT_COARSEN = 2;
+const DEFAULT_YEAR_AGG = 5;
 const viewportSelect = document.querySelector("#viewport-select");
 const statusEl = document.querySelector("#status");
 const sliderEl = document.querySelector("#year-slider");
@@ -37,6 +39,12 @@ const tooltipByScenario = {
 	SSP245: document.querySelector(".map-card[data-scenario='SSP245'] .tooltip"),
 	SSP370: document.querySelector(".map-card[data-scenario='SSP370'] .tooltip"),
 	SSP585: document.querySelector(".map-card[data-scenario='SSP585'] .tooltip"),
+};
+
+const brushSvgs = {
+	SSP245: document.querySelector(".map-card[data-scenario='SSP245'] svg.brush-overlay"),
+	SSP370: document.querySelector(".map-card[data-scenario='SSP370'] svg.brush-overlay"),
+	SSP585: document.querySelector(".map-card[data-scenario='SSP585'] svg.brush-overlay"),
 };
 
 let catalogRows = null;
@@ -577,6 +585,65 @@ function applyViewportSelection() {
 	renderFrame(state.frameIndex);
 }
 
+// Brush handling: when the user brushes a rectangle on any map, convert pixel box to lon/lat and apply to all maps
+function attachBrushHandlers() {
+	if (!d3 || !brushSvgs) return;
+	for (const scenario of Object.keys(brushSvgs)) {
+		const svgEl = brushSvgs[scenario];
+		if (!svgEl) continue;
+		const svg = d3.select(svgEl);
+		const brush = d3.brush()
+			.on("end", (event) => {
+				if (!state) return;
+				const sel = event.selection;
+				if (!sel) return;
+				const [[x0, y0], [x1, y1]] = sel;
+				const canvas = canvases[scenario];
+				const canvasRect = canvas.getBoundingClientRect();
+				const svgRect = svgEl.getBoundingClientRect();
+				// Convert brush-local coordinates to client coordinates, then to canvas-relative coordinates
+				const selClientX0 = svgRect.left + x0;
+				const selClientY0 = svgRect.top + y0;
+				const selClientX1 = svgRect.left + x1;
+				const selClientY1 = svgRect.top + y1;
+				let xRel0 = selClientX0 - canvasRect.left;
+				let yRel0 = selClientY0 - canvasRect.top;
+				let xRel1 = selClientX1 - canvasRect.left;
+				let yRel1 = selClientY1 - canvasRect.top;
+				// Clamp to canvas bounds
+				xRel0 = Math.max(0, Math.min(canvasRect.width, xRel0));
+				xRel1 = Math.max(0, Math.min(canvasRect.width, xRel1));
+				yRel0 = Math.max(0, Math.min(canvasRect.height, yRel0));
+				yRel1 = Math.max(0, Math.min(canvasRect.height, yRel1));
+				const width = canvasRect.width;
+				const height = canvasRect.height;
+				const vp = state.viewport;
+				const lonMin = vp.lonMin + (Math.min(xRel0, xRel1) / width) * (vp.lonMax - vp.lonMin);
+				const lonMax = vp.lonMin + (Math.max(xRel0, xRel1) / width) * (vp.lonMax - vp.lonMin);
+				const latMax = vp.latMax - (Math.min(yRel0, yRel1) / height) * (vp.latMax - vp.latMin);
+				const latMin = vp.latMax - (Math.max(yRel0, yRel1) / height) * (vp.latMax - vp.latMin);
+				state.viewport = { lonMin, lonMax, latMin, latMax, label: "Custom" };
+				state.viewportKey = "custom";
+				if (viewportSelect) {
+					// add custom option if not present
+					if (![...viewportSelect.options].some((o) => o.value === "custom")) {
+						const opt = document.createElement("option");
+						opt.value = "custom";
+						opt.text = "Custom";
+						viewportSelect.appendChild(opt);
+					}
+					viewportSelect.value = "custom";
+				}
+				// clear brush visual
+				svg.call(brush.move, null);
+				// re-render frames for all maps
+				renderFrame(state.frameIndex);
+			});
+
+		svg.call(brush);
+	}
+}
+
 async function loadFromPrecomputed() {
 	const response = await fetch("./cveg_precomputed.json");
 	if (!response.ok) throw new Error("Precomputed file not found");
@@ -625,10 +692,10 @@ async function loadFromZarr(coarsenFactor, yearAgg, requestId) {
 
 async function loadAndCompute() {
 	const requestId = ++currentRequestId;
-	const coarsenFactor = Math.max(1, Math.floor(Number(coarsenInput.value) || 1));
-	const yearAgg = Math.max(1, Math.floor(Number(yearAggInput.value) || 1));
-	coarsenInput.value = String(coarsenFactor);
-	yearAggInput.value = String(yearAgg);
+	const coarsenFactor = coarsenInput ? Math.max(1, Math.floor(Number(coarsenInput.value) || DEFAULT_COARSEN)) : DEFAULT_COARSEN;
+	const yearAgg = yearAggInput ? Math.max(1, Math.floor(Number(yearAggInput.value) || DEFAULT_YEAR_AGG)) : DEFAULT_YEAR_AGG;
+	if (coarsenInput) coarsenInput.value = String(coarsenFactor);
+	if (yearAggInput) yearAggInput.value = String(yearAgg);
 	loadingOverlay.classList.remove("hidden");
 	let processed, years;
 
@@ -660,14 +727,15 @@ async function loadAndCompute() {
 	sliderEl.value = "0";
 	sliderEl.disabled = false;
 	for (const scenario of Object.keys(DATASET_IDS)) attachTooltipHandlers(scenario);
+	attachBrushHandlers();
 	renderFrame(0);
 	drawTimeseries(state);
 	loadingOverlay.classList.add("hidden");
+	setStatus("Loaded data", "status-ok");
 	document.querySelector("#map-caption").textContent =
 		`Each map shows how much vegetation carbon (cVeg) has changed compared to the 2015 baseline. ` +
 		`Monthly model output was grouped into ${yearAgg}-year averages, and every ${coarsenFactor}×${coarsenFactor} block of grid cells was merged into one — ` +
 		`then the difference from the first time step was calculated to show the anomaly.`;
-	setStatus(`Loaded — ${yearAgg}-year bins, coarsening ×${coarsenFactor}, focused on ${state.viewport.label}.`, "status-ok");
 	window.cvegD3State = state;
 }
 
@@ -677,23 +745,25 @@ window.addEventListener("resize", () => {
 	if (state) renderFrame(state.frameIndex);
 });
 
-loadButton.addEventListener("click", async () => {
-	loadButton.disabled = true;
-	sliderEl.disabled = true;
-	try {
-		await loadAndCompute();
-	} catch (error) {
-		console.error(error);
-		loadingOverlay.classList.add("hidden");
-		setStatus(`Load failed: ${error.message}`, "status-warn");
-	} finally {
-		loadButton.disabled = false;
-	}
-});
+if (loadButton) {
+	loadButton.addEventListener("click", async () => {
+		loadButton.disabled = true;
+		sliderEl.disabled = true;
+		try {
+			await loadAndCompute();
+		} catch (error) {
+			console.error(error);
+			loadingOverlay.classList.add("hidden");
+			setStatus(`Load failed: ${error.message}`, "status-warn");
+		} finally {
+			loadButton.disabled = false;
+		}
+	});
+}
 
 // Auto-load on page start
 (async () => {
-	loadButton.disabled = true;
+	if (loadButton) loadButton.disabled = true;
 	try {
 		await loadAndCompute();
 	} catch (error) {
@@ -701,6 +771,6 @@ loadButton.addEventListener("click", async () => {
 		loadingOverlay.classList.add("hidden");
 		setStatus(`Load failed: ${error.message}`, "status-warn");
 	} finally {
-		loadButton.disabled = false;
+		if (loadButton) loadButton.disabled = false;
 	}
 })();

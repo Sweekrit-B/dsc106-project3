@@ -18,15 +18,6 @@
 		</p>
 
 		<div class="toolbar">
-			<button id="load-button" type="button">Reload</button>
-			<label class="control" for="coarsen-input">
-				<span>Coarsening</span>
-				<input id="coarsen-input" type="number" min="1" step="1" value="2" />
-			</label>
-			<label class="control" for="year-agg-input">
-				<span>Year aggregation</span>
-				<input id="year-agg-input" type="number" min="1" step="1" value="5" />
-			</label>
 			<label class="control" for="viewport-select">
 				<span>Focus region</span>
 				<select id="viewport-select">
@@ -42,8 +33,6 @@
 			<input id="year-slider" type="range" min="0" max="0" step="1" value="0" disabled />
 			<div id="year-label">Year: --</div>
 		</div>
-		<p class="control-note"><strong>Coarsening</strong> merges neighboring grid cells to speed up rendering (higher = faster but blurrier).</p>
-		<p class="control-note"><strong>Year aggregation</strong> averages monthly data into multi-year bins — e.g., 5 means each map frame represents a 5-year mean. Change either value and click <em>Reload</em> to recompute.</p>
 
 		<div id="loading-overlay">
 			<div class="spinner"></div>
@@ -64,22 +53,25 @@
 		</section>
 
 		<section class="map-grid" id="map-grid">
-			<article class="map-card" data-scenario="SSP245">
+			<article class="map-card" data-scenario="SSP245" style="position:relative;">
 				<h2>SSP2-4.5 — Moderate Emissions</h2>
 				<p class="scenario-subtitle">Some climate policy action. Temperatures projected to rise ~2–3 °C by 2100.</p>
 				<canvas class="map-canvas" id="canvas-ssp245"></canvas>
+				<svg class="brush-overlay" data-scenario="SSP245" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:auto;"></svg>
 				<div class="tooltip"></div>
 			</article>
-			<article class="map-card" data-scenario="SSP370">
+			<article class="map-card" data-scenario="SSP370" style="position:relative;">
 				<h2>SSP3-7.0 — High Emissions</h2>
 				<p class="scenario-subtitle">Limited policy action, regional fragmentation. Temperatures projected to rise ~3–4 °C by 2100.</p>
 				<canvas class="map-canvas" id="canvas-ssp370"></canvas>
+				<svg class="brush-overlay" data-scenario="SSP370" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:auto;"></svg>
 				<div class="tooltip"></div>
 			</article>
-			<article class="map-card" data-scenario="SSP585">
+			<article class="map-card" data-scenario="SSP585" style="position:relative;">
 				<h2>SSP5-8.5 — Extreme Emissions</h2>
 				<p class="scenario-subtitle">Fossil-fuel intensive, no mitigation. Temperatures projected to rise ~4–5 °C by 2100.</p>
 				<canvas class="map-canvas" id="canvas-ssp585"></canvas>
+				<svg class="brush-overlay" data-scenario="SSP585" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:auto;"></svg>
 				<div class="tooltip"></div>
 			</article>
 		</section>
