@@ -19,10 +19,14 @@ const VIEWPORT_PRESETS = {
 const loadButton = document.querySelector("#load-button");
 const coarsenInput = document.querySelector("#coarsen-input");
 const yearAggInput = document.querySelector("#year-agg-input");
+const DEFAULT_COARSEN = 2;
+const DEFAULT_YEAR_AGG = 5;
 const viewportSelect = document.querySelector("#viewport-select");
+const tsViewportSelect = document.querySelector("#ts-viewport-select");
 const statusEl = document.querySelector("#status");
 const sliderEl = document.querySelector("#year-slider");
-const yearLabelEl = document.querySelector("#year-label");
+const mapsSubtitleEl = document.querySelector("#maps-subtitle");
+const yearDisplayEl = document.querySelector("#year-display");
 const legendSvg = d3.select("#legend-svg");
 const loadingOverlay = document.querySelector("#loading-overlay");
 const loadingMessage = document.querySelector("#loading-message");
@@ -34,9 +38,15 @@ const canvases = {
 };
 
 const tooltipByScenario = {
-	SSP245: document.querySelector(".map-card[data-scenario='SSP245'] .tooltip"),
-	SSP370: document.querySelector(".map-card[data-scenario='SSP370'] .tooltip"),
-	SSP585: document.querySelector(".map-card[data-scenario='SSP585'] .tooltip"),
+	SSP245: document.querySelector("article[data-scenario='SSP245'] .tooltip"),
+	SSP370: document.querySelector("article[data-scenario='SSP370'] .tooltip"),
+	SSP585: document.querySelector("article[data-scenario='SSP585'] .tooltip"),
+};
+
+const brushSvgs = {
+	SSP245: document.querySelector("article[data-scenario='SSP245'] svg.brush-overlay"),
+	SSP370: document.querySelector("article[data-scenario='SSP370'] svg.brush-overlay"),
+	SSP585: document.querySelector("article[data-scenario='SSP585'] svg.brush-overlay"),
 };
 
 let catalogRows = null;
@@ -260,9 +270,9 @@ function drawLegend(vmax, colorScale) {
 	for (let i = 0; i <= 100; i += 1) gradient.append("stop").attr("offset", `${i}%`).attr("stop-color", colorScale(-vmax + (i / 100) * 2 * vmax));
 
 	legendSvg.append("rect").attr("x", margin.left).attr("y", margin.top).attr("width", innerWidth).attr("height", 12).attr("fill", "url(#legend-gradient)").attr("stroke", "#6d7d85").attr("stroke-width", 0.5);
-	const scale = d3.scaleLinear().domain([vmax, -vmax]).range([margin.left, margin.left + innerWidth]);
+	const scale = d3.scaleLinear().domain([-vmax, vmax]).range([margin.left, margin.left + innerWidth]);
 	legendSvg.append("g").attr("transform", `translate(0, ${margin.top + 12})`).call(d3.axisBottom(scale).ticks(7).tickFormat(d3.format(".2~g"))).call((g) => g.select(".domain").attr("stroke", "#55656d")).call((g) => g.selectAll("line").attr("stroke", "#55656d")).call((g) => g.selectAll("text").attr("fill", "#33464f").attr("font-size", 11));
-	legendSvg.append("text").attr("x", margin.left).attr("y", 52).attr("fill", "#33464f").attr("font-size", 11).text("cVeg anomaly");
+	legendSvg.append("text").attr("x", margin.left).attr("y", 52).attr("fill", "#33464f").attr("font-size", 11);
 }
 
 function attachTooltipHandlers(scenario) {
@@ -389,13 +399,74 @@ function computeGlobalMeans(processed) {
 	return means;
 }
 
+// Compute means for each scenario, optionally restricted to a viewport bounding box
+function computeRegionalMeans(processed, viewport = null) {
+	if (!viewport) return computeGlobalMeans(processed);
+	const { lonMin, lonMax, latMin, latMax } = viewport;
+	const means = {};
+	for (const [scenario, item] of Object.entries(processed)) {
+		const { anomFrames, lats, lons, dims, landMask } = item;
+		const { nLat, nLon } = dims;
+		// precompute x/y masks
+		const xMask = new Uint8Array(nLon);
+		for (let x = 0; x < nLon; x += 1) {
+			const lon = Number(lons[x]);
+			if (lonMin <= lonMax) {
+				xMask[x] = lon >= lonMin && lon <= lonMax ? 1 : 0;
+			} else {
+				// wrap-around (e.g., selection crosses dateline)
+				xMask[x] = lon >= lonMin || lon <= lonMax ? 1 : 0;
+			}
+		}
+		const yMask = new Uint8Array(nLat);
+		for (let y = 0; y < nLat; y += 1) {
+			const lat = Number(lats[y]);
+			yMask[y] = lat >= latMin && lat <= latMax ? 1 : 0;
+		}
+
+		means[scenario] = anomFrames.map((frame) => {
+			let sum = 0;
+			let count = 0;
+			for (let y = 0; y < nLat; y += 1) {
+				if (!yMask[y]) continue;
+				for (let x = 0; x < nLon; x += 1) {
+					if (!xMask[x]) continue;
+					const idx = y * nLon + x;
+					if (landMask && !landMask[idx]) continue;
+					const v = frame[idx];
+					if (Number.isFinite(v)) { sum += v; count += 1; }
+				}
+			}
+			return count ? sum / count : Number.NaN;
+		});
+	}
+	return means;
+}
+
+function updateTimeseriesTitle(viewport) {
+	const titleSpan = document.querySelector('.timeseries-wrap h3 .ts-title-text');
+	if (!titleSpan) return;
+	titleSpan.textContent = 'Mean Change in Vegetation Carbon (kg C m⁻²) Relative to 2015 Until 2100, Focusing on';
+	// Sync the timeseries select to the viewport key (if provided) or to the presets mapping
+	if (tsViewportSelect && viewport) {
+		if (typeof viewport === 'string') {
+			tsViewportSelect.value = viewport;
+		} else if (viewport && viewport.label) {
+			const found = Object.entries(VIEWPORT_PRESETS).find(([, v]) => v.label === viewport.label);
+			if (found) tsViewportSelect.value = found[0];
+		}
+	}
+}
+
 function drawTimeseries(appState) {
 	const { years } = appState;
-	const means = computeGlobalMeans(appState.processed);
+	// update heading to reflect current viewport/region
+	updateTimeseriesTitle(appState.viewport);
+	const means = computeRegionalMeans(appState.processed, appState.viewport);
 
-	const margin = { top: 32, right: 110, bottom: 64, left: 68 };
-	const totalWidth = 860;
-	const totalHeight = 250;
+	const margin = { top: 20, right: 40, bottom: 30, left: 30 };
+	const totalWidth = 1000;
+	const totalHeight = 280;
 	const w = totalWidth - margin.left - margin.right;
 	const h = totalHeight - margin.top - margin.bottom;
 
@@ -448,12 +519,12 @@ function drawTimeseries(appState) {
 		const lastVal = vals.at(-1);
 		if (Number.isFinite(lastVal)) {
 			g.append("text")
-				.attr("x", xScale(years.at(-1)) + 7)
+				.attr("x", xScale(years.at(-1)) + 10)
 				.attr("y", yScale(lastVal))
-				.attr("dominant-baseline", "middle")
+				.attr("dominant-baseline", "hanging")
 				.attr("fill", colors[scenario])
-				.attr("font-size", 12)
-				.attr("font-weight", 600)
+				.attr("font-size", 9)
+				.attr("font-weight", 500)
 				.text(scenario);
 		}
 	}
@@ -466,21 +537,17 @@ function drawTimeseries(appState) {
 			.attr("transform", "rotate(-40)")
 			.attr("text-anchor", "end")
 			.attr("dx", "-0.4em")
-			.attr("dy", "0.2em"));
-	g.append("g").call(d3.axisLeft(yScale).ticks(5));
+			.attr("dy", "0.2em")
+			.attr("font-size", 9));
+	g.append("g").call(d3.axisLeft(yScale).ticks(5))
+		.call((ax) => ax.selectAll("text").attr("font-size", 9));
 
 	// Y-axis label only (year is obvious from slanted labels)
 	g.append("text")
 		.attr("transform", "rotate(-90)")
 		.attr("x", -h / 2).attr("y", -56)
-		.attr("text-anchor", "middle").attr("font-size", 12).attr("fill", "#55656d")
+		.attr("text-anchor", "middle").attr("font-size", 10).attr("fill", "#55656d")
 		.text("Global Mean Anomaly (kg C m⁻²)");
-
-	// Chart title (describes transformations per rubric)
-	svg.append("text")
-		.attr("x", margin.left + w / 2).attr("y", 20)
-		.attr("text-anchor", "middle").attr("font-size", 13).attr("font-weight", 700).attr("fill", "#202a30")
-		.text(`cVeg Anomaly — ${appState.yearAgg}-yr means, relative to ${years[0]} baseline (BCC-CSM2-MR, spatially coarsened ×${appState.coarsenFactor})`);
 
 	// Vertical indicator (linked to slider)
 	const indicator = g.append("line")
@@ -502,18 +569,13 @@ function drawTimeseries(appState) {
 		.append("div")
 		.attr("class", "ts-tooltip")
 		.style("opacity", 0)
-		.style("background", "rgba(24,33,36,0.9)")
-		.style("color", "#fff")
-		.style("border-radius", "6px")
-		.style("padding", "0.4rem 0.6rem")
-		.style("font-size", "0.78rem")
 		.style("line-height", "1.55")
 		.style("white-space", "nowrap");
 
 	function highlightIndex(idx, mouseX, mouseY) {
 		const year = years[idx];
 		indicator.attr("x1", xScale(year)).attr("x2", xScale(year)).style("opacity", 1);
-		const lines = [`<strong>Year ${year}</strong>`];
+		const lines = [`<strong>${year}</strong>`];
 		for (const [scenario, vals] of Object.entries(means)) {
 			const v = vals[idx];
 			dots[scenario]
@@ -560,7 +622,10 @@ function drawTimeseries(appState) {
 function renderFrame(frameIndex) {
 	if (!state) return;
 	state.frameIndex = frameIndex;
-	yearLabelEl.textContent = `Year: ${state.years[frameIndex]}`;
+	const currentYear = state.years[frameIndex];
+	if (yearDisplayEl) {
+		yearDisplayEl.textContent = currentYear;
+	}
 	const viewport = state.viewport;
 	for (const scenario of Object.keys(DATASET_IDS)) {
 		const item = state.processed[scenario];
@@ -575,6 +640,86 @@ function applyViewportSelection() {
 	state.viewportKey = currentViewportKey;
 	state.viewport = getViewport(currentViewportKey);
 	renderFrame(state.frameIndex);
+	if (state) drawTimeseries(state);
+	// keep timeseries dropdown in sync
+	if (tsViewportSelect) tsViewportSelect.value = viewportSelect.value;
+}
+
+function syncViewportSelects(key) {
+	if (!key) return;
+	if (viewportSelect) viewportSelect.value = key;
+	if (tsViewportSelect) tsViewportSelect.value = key;
+}
+
+// Brush handling: when the user brushes a rectangle on any map, convert pixel box to lon/lat and apply to all maps
+function attachBrushHandlers() {
+	if (!d3 || !brushSvgs) return;
+	for (const scenario of Object.keys(brushSvgs)) {
+		const svgEl = brushSvgs[scenario];
+		if (!svgEl) continue;
+		const svg = d3.select(svgEl);
+		const brush = d3.brush()
+			.on("end", (event) => {
+				if (!state) return;
+				const sel = event.selection;
+				if (!sel) return;
+				const [[x0, y0], [x1, y1]] = sel;
+				const canvas = canvases[scenario];
+				const canvasRect = canvas.getBoundingClientRect();
+				const svgRect = svgEl.getBoundingClientRect();
+				// Convert brush-local coordinates to client coordinates, then to canvas-relative coordinates
+				const selClientX0 = svgRect.left + x0;
+				const selClientY0 = svgRect.top + y0;
+				const selClientX1 = svgRect.left + x1;
+				const selClientY1 = svgRect.top + y1;
+				let xRel0 = selClientX0 - canvasRect.left;
+				let yRel0 = selClientY0 - canvasRect.top;
+				let xRel1 = selClientX1 - canvasRect.left;
+				let yRel1 = selClientY1 - canvasRect.top;
+				// Clamp to canvas bounds
+				xRel0 = Math.max(0, Math.min(canvasRect.width, xRel0));
+				xRel1 = Math.max(0, Math.min(canvasRect.width, xRel1));
+				yRel0 = Math.max(0, Math.min(canvasRect.height, yRel0));
+				yRel1 = Math.max(0, Math.min(canvasRect.height, yRel1));
+				const width = canvasRect.width;
+				const height = canvasRect.height;
+				const vp = state.viewport;
+				const lonMin = vp.lonMin + (Math.min(xRel0, xRel1) / width) * (vp.lonMax - vp.lonMin);
+				const lonMax = vp.lonMin + (Math.max(xRel0, xRel1) / width) * (vp.lonMax - vp.lonMin);
+				const latMax = vp.latMax - (Math.min(yRel0, yRel1) / height) * (vp.latMax - vp.latMin);
+				const latMin = vp.latMax - (Math.max(yRel0, yRel1) / height) * (vp.latMax - vp.latMin);
+					state.viewport = { lonMin, lonMax, latMin, latMax, label: "a user-selected region" };
+				state.viewportKey = "custom";
+				if (viewportSelect) {
+					// add custom option if not present
+					if (![...viewportSelect.options].some((o) => o.value === "custom")) {
+						const opt = document.createElement("option");
+						opt.value = "custom";
+							opt.text = "a user-selected region";
+						viewportSelect.appendChild(opt);
+					}
+					viewportSelect.value = "custom";
+					// ensure timeseries select also has custom and is synced
+					if (tsViewportSelect) {
+						if (![...tsViewportSelect.options].some((o) => o.value === "custom")) {
+							const opt2 = document.createElement("option");
+							opt2.value = "custom";
+							opt2.text = "a user-selected region";
+							tsViewportSelect.appendChild(opt2);
+						}
+						tsViewportSelect.value = "custom";
+					}
+				}
+				// clear brush visual
+				svg.call(brush.move, null);
+				// re-render frames for all maps
+				renderFrame(state.frameIndex);
+				// update timeseries to reflect new viewport selection
+				drawTimeseries(state);
+			});
+
+		svg.call(brush);
+	}
 }
 
 async function loadFromPrecomputed() {
@@ -625,10 +770,10 @@ async function loadFromZarr(coarsenFactor, yearAgg, requestId) {
 
 async function loadAndCompute() {
 	const requestId = ++currentRequestId;
-	const coarsenFactor = Math.max(1, Math.floor(Number(coarsenInput.value) || 1));
-	const yearAgg = Math.max(1, Math.floor(Number(yearAggInput.value) || 1));
-	coarsenInput.value = String(coarsenFactor);
-	yearAggInput.value = String(yearAgg);
+	const coarsenFactor = coarsenInput ? Math.max(1, Math.floor(Number(coarsenInput.value) || DEFAULT_COARSEN)) : DEFAULT_COARSEN;
+	const yearAgg = yearAggInput ? Math.max(1, Math.floor(Number(yearAggInput.value) || DEFAULT_YEAR_AGG)) : DEFAULT_YEAR_AGG;
+	if (coarsenInput) coarsenInput.value = String(coarsenFactor);
+	if (yearAggInput) yearAggInput.value = String(yearAgg);
 	loadingOverlay.classList.remove("hidden");
 	let processed, years;
 
@@ -643,7 +788,7 @@ async function loadAndCompute() {
 			({ processed, years } = result);
 		}
 	} else {
-		setStatus("Custom settings — loading from API (this may take a while)...");
+		setStatus("Loading custom region from brush selection...");
 		const result = await loadFromZarr(coarsenFactor, yearAgg, requestId);
 		if (!result) return;
 		({ processed, years } = result);
@@ -660,40 +805,48 @@ async function loadAndCompute() {
 	sliderEl.value = "0";
 	sliderEl.disabled = false;
 	for (const scenario of Object.keys(DATASET_IDS)) attachTooltipHandlers(scenario);
+	attachBrushHandlers();
 	renderFrame(0);
+	// ensure both selects reflect the initial viewport
+	syncViewportSelects(state.viewportKey);
 	drawTimeseries(state);
 	loadingOverlay.classList.add("hidden");
-	document.querySelector("#map-caption").textContent =
-		`Each map shows how much vegetation carbon (cVeg) has changed compared to the 2015 baseline. ` +
-		`Monthly model output was grouped into ${yearAgg}-year averages, and every ${coarsenFactor}×${coarsenFactor} block of grid cells was merged into one — ` +
-		`then the difference from the first time step was calculated to show the anomaly.`;
-	setStatus(`Loaded — ${yearAgg}-year bins, coarsening ×${coarsenFactor}, focused on ${state.viewport.label}.`, "status-ok");
+	setStatus("");
 	window.cvegD3State = state;
 }
 
 sliderEl.addEventListener("input", () => renderFrame(Number(sliderEl.value)));
 viewportSelect.addEventListener("change", applyViewportSelection);
+if (tsViewportSelect) {
+	tsViewportSelect.addEventListener("change", () => {
+		// mirror selection into primary viewport select and apply
+		viewportSelect.value = tsViewportSelect.value;
+		applyViewportSelection();
+	});
+}
 window.addEventListener("resize", () => {
 	if (state) renderFrame(state.frameIndex);
 });
 
-loadButton.addEventListener("click", async () => {
-	loadButton.disabled = true;
-	sliderEl.disabled = true;
-	try {
-		await loadAndCompute();
-	} catch (error) {
-		console.error(error);
-		loadingOverlay.classList.add("hidden");
-		setStatus(`Load failed: ${error.message}`, "status-warn");
-	} finally {
-		loadButton.disabled = false;
-	}
-});
+if (loadButton) {
+	loadButton.addEventListener("click", async () => {
+		loadButton.disabled = true;
+		sliderEl.disabled = true;
+		try {
+			await loadAndCompute();
+		} catch (error) {
+			console.error(error);
+			loadingOverlay.classList.add("hidden");
+			setStatus(`Load failed: ${error.message}`, "status-warn");
+		} finally {
+			loadButton.disabled = false;
+		}
+	});
+}
 
 // Auto-load on page start
 (async () => {
-	loadButton.disabled = true;
+	if (loadButton) loadButton.disabled = true;
 	try {
 		await loadAndCompute();
 	} catch (error) {
@@ -701,6 +854,6 @@ loadButton.addEventListener("click", async () => {
 		loadingOverlay.classList.add("hidden");
 		setStatus(`Load failed: ${error.message}`, "status-warn");
 	} finally {
-		loadButton.disabled = false;
+		if (loadButton) loadButton.disabled = false;
 	}
 })();
