@@ -100,7 +100,43 @@
 
 		<section class="writeup-section">
 			<h2>Writeup</h2>
-			<p class="writeup-placeholder">This is where the writeup will go.</p>
+			<p class="rationale">
+				Our primary goal for this project is to create an interactive visualization exploring the projected change of vegetation carbon mass (cVeg).
+				We have created three graphs to show the change of cVeg under three different scenarios (SSP2-4.5, SSP3-7.0, SSP5-8.5) from 2015 to 2100.
+
+				The interactive aspects of the visualization include a year slider that allows users to scrub through time and compare how different emission pathways lead to different outcomes across the globe.
+				We chose to use a year slider because it provides an intuitive way for users to explore the temporal dimension of the data and see how vegetation carbon storage evolves over time under different climate scenarios.
+				In comparison to a dropdown menu or buttons for specific years, a slider allows for smoother transitions and a more engaging user experience, enabling users to easily observe trends and patterns in the data.
+				We considered allowing controls for coarsening the data (merging neighboring grid cells) and aggregating the data into multi-year bins, which can help speed up rendering and provide a clearer picture of long-term trends. 
+				However, we ultimately decided against adding these controls to keep the interface simple and focused on the main interactive element (the year slider).
+				Users can also choose to focus on specific regions of the world using a dropdown menu, which updates the maps to show only the selected area.
+				This feature allows users to explore regional variations in vegetation carbon storage and understand how different parts of the world may be affected differently by climate change.
+				We considered using a world map with clickable regions to select focus areas, but ultimately decided on a dropdown menu for simplicity and ease of use, especially on smaller screens where clicking on specific regions might be more challenging.
+
+				The maps use a color scheme where green indicates more carbon stored in vegetation than in 2015 (beneficial for the climate), while red/brown indicates less carbon stored (detrimental for the climate). 
+				Blue areas represent oceans which lack data, and grey indicates no significant change from the baseline.
+				We chose green and red/brown to represent positive and negative changes in vegetation carbon storage because these colors are commonly associated with growth and decline, respectively, making it easier for users to quickly interpret the data.
+				We did not consider using other color schemes, as the green-red contrast is widely recognized and effective for conveying the intended message without overcomplicating the visualization.
+
+				We included a line graph showing the global mean cVeg anomaly over time for each scenario to provide a clear visual representation of how vegetation carbon storage is projected to change on a global scale under different emission pathways.
+				Users can interact with the line graph by clicking on it to jump to a specific year, which updates the maps above accordingly. 
+				This interactivity allows users to explore the relationship between global trends and regional changes in vegetation carbon storage, enhancing their understanding of the data and its implications for climate change.
+				It provides a more comprehensive view of the data, allowing users to see both the overall trends and the regional variations in vegetation carbon storage under different climate scenarios.
+				We considered using a bar chart or scatter plot to show the global mean cVeg anomaly, but ultimately decided on a line graph because it effectively conveys trends over time and allows for easy comparison between scenarios.
+				This graph also does not change to show different regions, as it is meant to provide a global overview rather than regional details, which are better explored through the maps.
+			</p>
+			<p class="overview">
+				The team evenly split the work of this project, with each member taking responsibility for different aspects of the visualization and writeup.
+				Sweekrit focused on data processing, map rendering, and implementing the interactive controls. 
+				Sweekrit spent around 6-7 hours. 
+				Majority of it was spent reading through the data information and figuring out how to most efficiently get the information from it, followed by creating the initial visualizations for the maps over time.
+				Nirav worked on improving the webpage data loading performance and providing more detailed graph annotations.
+				Nirav spent around 3-4 hours on the project, with the majority of time spent on optimizing data loading and rendering performance, as well as adding detailed annotations to the graphs to enhance user understanding of the data.
+				Arah contributed to the writeup and finalizing the website. 
+				Arah spent roughly around 2-3 hours on the project, with the majority of time spent on writing the rationale and overview sections of the writeup, as well as proofreading and editing the final content for clarity and coherence.
+				The team collaborated closely throughout the project, regularly sharing updates and providing feedback to ensure a cohesive and polished final product.
+				All aspects of the project were thoroughly discussed and agreed upon by the team, with each member contributing idaeas and suggestions throughout the project.
+			</p>
 		</section>
 	</main>
 
