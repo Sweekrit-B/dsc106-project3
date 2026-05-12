@@ -74,7 +74,17 @@
 		</div>
 
 		<section class="timeseries-wrap">
-			<h3>Global Mean Change in Vegetation Carbon (kg C m⁻²) Relative to 2015 Until 2100</h3>
+			<h3 class="maps-subtitle"><span class="ts-title-text">Mean Change in Vegetation Carbon (kg C m⁻²) Relative to 2015 Until 2100, Focusing on</span>
+				<select id="ts-viewport-select" class="region-select">
+					<option value="global">the World</option>
+					<option value="south-america">South America</option>
+					<option value="north-america">North America</option>
+					<option value="europe">Europe</option>
+					<option value="africa">Africa</option>
+					<option value="asia">Asia</option>
+					<option value="oceania">Oceania</option>
+				</select>
+			</h3>
 			<div id="timeseries-container"></div>
 			<p class="chart-explanation">
 					This chart compares the global mean vegetation carbon anomaly over time for each emissions scenario relative to the 2015 baseline. Although all scenarios initially show modest increases in vegetation carbon, their trajectories diverge later in the century as warming intensifies. Moderate warming can temporarily enhance plant growth through longer growing seasons and increased atmospheric CO₂ concentrations, but stronger warming and climate stressors — including heat extremes, drought, wildfire activity, and ecosystem degradation — can reduce the ability of vegetation to continue storing carbon. By 2100, higher-emissions pathways exhibit larger departures from the baseline and greater variability, highlighting how future climate conditions may alter the role of terrestrial ecosystems in the global carbon cycle.

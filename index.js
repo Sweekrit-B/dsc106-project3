@@ -22,6 +22,7 @@ const yearAggInput = document.querySelector("#year-agg-input");
 const DEFAULT_COARSEN = 2;
 const DEFAULT_YEAR_AGG = 5;
 const viewportSelect = document.querySelector("#viewport-select");
+const tsViewportSelect = document.querySelector("#ts-viewport-select");
 const statusEl = document.querySelector("#status");
 const sliderEl = document.querySelector("#year-slider");
 const mapsSubtitleEl = document.querySelector("#maps-subtitle");
@@ -398,9 +399,70 @@ function computeGlobalMeans(processed) {
 	return means;
 }
 
+// Compute means for each scenario, optionally restricted to a viewport bounding box
+function computeRegionalMeans(processed, viewport = null) {
+	if (!viewport) return computeGlobalMeans(processed);
+	const { lonMin, lonMax, latMin, latMax } = viewport;
+	const means = {};
+	for (const [scenario, item] of Object.entries(processed)) {
+		const { anomFrames, lats, lons, dims, landMask } = item;
+		const { nLat, nLon } = dims;
+		// precompute x/y masks
+		const xMask = new Uint8Array(nLon);
+		for (let x = 0; x < nLon; x += 1) {
+			const lon = Number(lons[x]);
+			if (lonMin <= lonMax) {
+				xMask[x] = lon >= lonMin && lon <= lonMax ? 1 : 0;
+			} else {
+				// wrap-around (e.g., selection crosses dateline)
+				xMask[x] = lon >= lonMin || lon <= lonMax ? 1 : 0;
+			}
+		}
+		const yMask = new Uint8Array(nLat);
+		for (let y = 0; y < nLat; y += 1) {
+			const lat = Number(lats[y]);
+			yMask[y] = lat >= latMin && lat <= latMax ? 1 : 0;
+		}
+
+		means[scenario] = anomFrames.map((frame) => {
+			let sum = 0;
+			let count = 0;
+			for (let y = 0; y < nLat; y += 1) {
+				if (!yMask[y]) continue;
+				for (let x = 0; x < nLon; x += 1) {
+					if (!xMask[x]) continue;
+					const idx = y * nLon + x;
+					if (landMask && !landMask[idx]) continue;
+					const v = frame[idx];
+					if (Number.isFinite(v)) { sum += v; count += 1; }
+				}
+			}
+			return count ? sum / count : Number.NaN;
+		});
+	}
+	return means;
+}
+
+function updateTimeseriesTitle(viewport) {
+	const titleSpan = document.querySelector('.timeseries-wrap h3 .ts-title-text');
+	if (!titleSpan) return;
+	titleSpan.textContent = 'Mean Change in Vegetation Carbon (kg C m⁻²) Relative to 2015 Until 2100, Focusing on';
+	// Sync the timeseries select to the viewport key (if provided) or to the presets mapping
+	if (tsViewportSelect && viewport) {
+		if (typeof viewport === 'string') {
+			tsViewportSelect.value = viewport;
+		} else if (viewport && viewport.label) {
+			const found = Object.entries(VIEWPORT_PRESETS).find(([, v]) => v.label === viewport.label);
+			if (found) tsViewportSelect.value = found[0];
+		}
+	}
+}
+
 function drawTimeseries(appState) {
 	const { years } = appState;
-	const means = computeGlobalMeans(appState.processed);
+	// update heading to reflect current viewport/region
+	updateTimeseriesTitle(appState.viewport);
+	const means = computeRegionalMeans(appState.processed, appState.viewport);
 
 	const margin = { top: 20, right: 30, bottom: 30, left: 30 };
 	const totalWidth = 1000;
@@ -457,8 +519,8 @@ function drawTimeseries(appState) {
 		const lastVal = vals.at(-1);
 		if (Number.isFinite(lastVal)) {
 			g.append("text")
-				.attr("x", xScale(years.at(-1)) - 30)
-				.attr("y", yScale(lastVal) + 12)
+				.attr("x", xScale(years.at(-1)) + 10)
+				.attr("y", yScale(lastVal))
 				.attr("dominant-baseline", "hanging")
 				.attr("fill", colors[scenario])
 				.attr("font-size", 9)
@@ -578,6 +640,15 @@ function applyViewportSelection() {
 	state.viewportKey = currentViewportKey;
 	state.viewport = getViewport(currentViewportKey);
 	renderFrame(state.frameIndex);
+	if (state) drawTimeseries(state);
+	// keep timeseries dropdown in sync
+	if (tsViewportSelect) tsViewportSelect.value = viewportSelect.value;
+}
+
+function syncViewportSelects(key) {
+	if (!key) return;
+	if (viewportSelect) viewportSelect.value = key;
+	if (tsViewportSelect) tsViewportSelect.value = key;
 }
 
 // Brush handling: when the user brushes a rectangle on any map, convert pixel box to lon/lat and apply to all maps
@@ -628,11 +699,23 @@ function attachBrushHandlers() {
 						viewportSelect.appendChild(opt);
 					}
 					viewportSelect.value = "custom";
+					// ensure timeseries select also has custom and is synced
+					if (tsViewportSelect) {
+						if (![...tsViewportSelect.options].some((o) => o.value === "custom")) {
+							const opt2 = document.createElement("option");
+							opt2.value = "custom";
+							opt2.text = "a user-selected region";
+							tsViewportSelect.appendChild(opt2);
+						}
+						tsViewportSelect.value = "custom";
+					}
 				}
 				// clear brush visual
 				svg.call(brush.move, null);
 				// re-render frames for all maps
 				renderFrame(state.frameIndex);
+				// update timeseries to reflect new viewport selection
+				drawTimeseries(state);
 			});
 
 		svg.call(brush);
@@ -724,6 +807,8 @@ async function loadAndCompute() {
 	for (const scenario of Object.keys(DATASET_IDS)) attachTooltipHandlers(scenario);
 	attachBrushHandlers();
 	renderFrame(0);
+	// ensure both selects reflect the initial viewport
+	syncViewportSelects(state.viewportKey);
 	drawTimeseries(state);
 	loadingOverlay.classList.add("hidden");
 	setStatus("");
@@ -732,6 +817,13 @@ async function loadAndCompute() {
 
 sliderEl.addEventListener("input", () => renderFrame(Number(sliderEl.value)));
 viewportSelect.addEventListener("change", applyViewportSelection);
+if (tsViewportSelect) {
+	tsViewportSelect.addEventListener("change", () => {
+		// mirror selection into primary viewport select and apply
+		viewportSelect.value = tsViewportSelect.value;
+		applyViewportSelection();
+	});
+}
 window.addEventListener("resize", () => {
 	if (state) renderFrame(state.frameIndex);
 });

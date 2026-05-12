@@ -217,6 +217,9 @@ h1 {
 	color: #29434b;
 	line-height: 1.4;
 	text-transform: none;
+	display: inline-flex;
+	align-items: center;
+	gap: 0.5rem;
 }
 
 .region-select {
