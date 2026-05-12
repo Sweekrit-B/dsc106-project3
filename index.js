@@ -464,7 +464,7 @@ function drawTimeseries(appState) {
 	updateTimeseriesTitle(appState.viewport);
 	const means = computeRegionalMeans(appState.processed, appState.viewport);
 
-	const margin = { top: 20, right: 30, bottom: 30, left: 30 };
+	const margin = { top: 20, right: 40, bottom: 30, left: 30 };
 	const totalWidth = 1000;
 	const totalHeight = 280;
 	const w = totalWidth - margin.left - margin.right;
