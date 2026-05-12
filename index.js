@@ -24,7 +24,8 @@ const DEFAULT_YEAR_AGG = 5;
 const viewportSelect = document.querySelector("#viewport-select");
 const statusEl = document.querySelector("#status");
 const sliderEl = document.querySelector("#year-slider");
-const yearLabelEl = document.querySelector("#year-label");
+const mapsSubtitleEl = document.querySelector("#maps-subtitle");
+const yearDisplayEl = document.querySelector("#year-display");
 const legendSvg = d3.select("#legend-svg");
 const loadingOverlay = document.querySelector("#loading-overlay");
 const loadingMessage = document.querySelector("#loading-message");
@@ -36,15 +37,15 @@ const canvases = {
 };
 
 const tooltipByScenario = {
-	SSP245: document.querySelector(".map-card[data-scenario='SSP245'] .tooltip"),
-	SSP370: document.querySelector(".map-card[data-scenario='SSP370'] .tooltip"),
-	SSP585: document.querySelector(".map-card[data-scenario='SSP585'] .tooltip"),
+	SSP245: document.querySelector("article[data-scenario='SSP245'] .tooltip"),
+	SSP370: document.querySelector("article[data-scenario='SSP370'] .tooltip"),
+	SSP585: document.querySelector("article[data-scenario='SSP585'] .tooltip"),
 };
 
 const brushSvgs = {
-	SSP245: document.querySelector(".map-card[data-scenario='SSP245'] svg.brush-overlay"),
-	SSP370: document.querySelector(".map-card[data-scenario='SSP370'] svg.brush-overlay"),
-	SSP585: document.querySelector(".map-card[data-scenario='SSP585'] svg.brush-overlay"),
+	SSP245: document.querySelector("article[data-scenario='SSP245'] svg.brush-overlay"),
+	SSP370: document.querySelector("article[data-scenario='SSP370'] svg.brush-overlay"),
+	SSP585: document.querySelector("article[data-scenario='SSP585'] svg.brush-overlay"),
 };
 
 let catalogRows = null;
@@ -268,9 +269,9 @@ function drawLegend(vmax, colorScale) {
 	for (let i = 0; i <= 100; i += 1) gradient.append("stop").attr("offset", `${i}%`).attr("stop-color", colorScale(-vmax + (i / 100) * 2 * vmax));
 
 	legendSvg.append("rect").attr("x", margin.left).attr("y", margin.top).attr("width", innerWidth).attr("height", 12).attr("fill", "url(#legend-gradient)").attr("stroke", "#6d7d85").attr("stroke-width", 0.5);
-	const scale = d3.scaleLinear().domain([vmax, -vmax]).range([margin.left, margin.left + innerWidth]);
+	const scale = d3.scaleLinear().domain([-vmax, vmax]).range([margin.left, margin.left + innerWidth]);
 	legendSvg.append("g").attr("transform", `translate(0, ${margin.top + 12})`).call(d3.axisBottom(scale).ticks(7).tickFormat(d3.format(".2~g"))).call((g) => g.select(".domain").attr("stroke", "#55656d")).call((g) => g.selectAll("line").attr("stroke", "#55656d")).call((g) => g.selectAll("text").attr("fill", "#33464f").attr("font-size", 11));
-	legendSvg.append("text").attr("x", margin.left).attr("y", 52).attr("fill", "#33464f").attr("font-size", 11).text("cVeg anomaly");
+	legendSvg.append("text").attr("x", margin.left).attr("y", 52).attr("fill", "#33464f").attr("font-size", 11);
 }
 
 function attachTooltipHandlers(scenario) {
@@ -401,9 +402,9 @@ function drawTimeseries(appState) {
 	const { years } = appState;
 	const means = computeGlobalMeans(appState.processed);
 
-	const margin = { top: 32, right: 110, bottom: 64, left: 68 };
-	const totalWidth = 860;
-	const totalHeight = 250;
+	const margin = { top: 20, right: 30, bottom: 30, left: 30 };
+	const totalWidth = 1000;
+	const totalHeight = 280;
 	const w = totalWidth - margin.left - margin.right;
 	const h = totalHeight - margin.top - margin.bottom;
 
@@ -456,12 +457,12 @@ function drawTimeseries(appState) {
 		const lastVal = vals.at(-1);
 		if (Number.isFinite(lastVal)) {
 			g.append("text")
-				.attr("x", xScale(years.at(-1)) + 7)
-				.attr("y", yScale(lastVal))
-				.attr("dominant-baseline", "middle")
+				.attr("x", xScale(years.at(-1)) - 30)
+				.attr("y", yScale(lastVal) + 12)
+				.attr("dominant-baseline", "hanging")
 				.attr("fill", colors[scenario])
-				.attr("font-size", 12)
-				.attr("font-weight", 600)
+				.attr("font-size", 9)
+				.attr("font-weight", 500)
 				.text(scenario);
 		}
 	}
@@ -474,21 +475,17 @@ function drawTimeseries(appState) {
 			.attr("transform", "rotate(-40)")
 			.attr("text-anchor", "end")
 			.attr("dx", "-0.4em")
-			.attr("dy", "0.2em"));
-	g.append("g").call(d3.axisLeft(yScale).ticks(5));
+			.attr("dy", "0.2em")
+			.attr("font-size", 9));
+	g.append("g").call(d3.axisLeft(yScale).ticks(5))
+		.call((ax) => ax.selectAll("text").attr("font-size", 9));
 
 	// Y-axis label only (year is obvious from slanted labels)
 	g.append("text")
 		.attr("transform", "rotate(-90)")
 		.attr("x", -h / 2).attr("y", -56)
-		.attr("text-anchor", "middle").attr("font-size", 12).attr("fill", "#55656d")
+		.attr("text-anchor", "middle").attr("font-size", 10).attr("fill", "#55656d")
 		.text("Global Mean Anomaly (kg C m⁻²)");
-
-	// Chart title (describes transformations per rubric)
-	svg.append("text")
-		.attr("x", margin.left + w / 2).attr("y", 20)
-		.attr("text-anchor", "middle").attr("font-size", 13).attr("font-weight", 700).attr("fill", "#202a30")
-		.text(`cVeg Anomaly — ${appState.yearAgg}-yr means, relative to ${years[0]} baseline (BCC-CSM2-MR, spatially coarsened ×${appState.coarsenFactor})`);
 
 	// Vertical indicator (linked to slider)
 	const indicator = g.append("line")
@@ -510,18 +507,13 @@ function drawTimeseries(appState) {
 		.append("div")
 		.attr("class", "ts-tooltip")
 		.style("opacity", 0)
-		.style("background", "rgba(24,33,36,0.9)")
-		.style("color", "#fff")
-		.style("border-radius", "6px")
-		.style("padding", "0.4rem 0.6rem")
-		.style("font-size", "0.78rem")
 		.style("line-height", "1.55")
 		.style("white-space", "nowrap");
 
 	function highlightIndex(idx, mouseX, mouseY) {
 		const year = years[idx];
 		indicator.attr("x1", xScale(year)).attr("x2", xScale(year)).style("opacity", 1);
-		const lines = [`<strong>Year ${year}</strong>`];
+		const lines = [`<strong>${year}</strong>`];
 		for (const [scenario, vals] of Object.entries(means)) {
 			const v = vals[idx];
 			dots[scenario]
@@ -568,7 +560,10 @@ function drawTimeseries(appState) {
 function renderFrame(frameIndex) {
 	if (!state) return;
 	state.frameIndex = frameIndex;
-	yearLabelEl.textContent = `Year: ${state.years[frameIndex]}`;
+	const currentYear = state.years[frameIndex];
+	if (yearDisplayEl) {
+		yearDisplayEl.textContent = currentYear;
+	}
 	const viewport = state.viewport;
 	for (const scenario of Object.keys(DATASET_IDS)) {
 		const item = state.processed[scenario];
@@ -622,14 +617,14 @@ function attachBrushHandlers() {
 				const lonMax = vp.lonMin + (Math.max(xRel0, xRel1) / width) * (vp.lonMax - vp.lonMin);
 				const latMax = vp.latMax - (Math.min(yRel0, yRel1) / height) * (vp.latMax - vp.latMin);
 				const latMin = vp.latMax - (Math.max(yRel0, yRel1) / height) * (vp.latMax - vp.latMin);
-				state.viewport = { lonMin, lonMax, latMin, latMax, label: "Custom" };
+					state.viewport = { lonMin, lonMax, latMin, latMax, label: "a user-selected region" };
 				state.viewportKey = "custom";
 				if (viewportSelect) {
 					// add custom option if not present
 					if (![...viewportSelect.options].some((o) => o.value === "custom")) {
 						const opt = document.createElement("option");
 						opt.value = "custom";
-						opt.text = "Custom";
+							opt.text = "a user-selected region";
 						viewportSelect.appendChild(opt);
 					}
 					viewportSelect.value = "custom";
@@ -710,7 +705,7 @@ async function loadAndCompute() {
 			({ processed, years } = result);
 		}
 	} else {
-		setStatus("Custom settings — loading from API (this may take a while)...");
+		setStatus("Loading custom region from brush selection...");
 		const result = await loadFromZarr(coarsenFactor, yearAgg, requestId);
 		if (!result) return;
 		({ processed, years } = result);
@@ -731,11 +726,7 @@ async function loadAndCompute() {
 	renderFrame(0);
 	drawTimeseries(state);
 	loadingOverlay.classList.add("hidden");
-	setStatus("Loaded data", "status-ok");
-	document.querySelector("#map-caption").textContent =
-		`Each map shows how much vegetation carbon (cVeg) has changed compared to the 2015 baseline. ` +
-		`Monthly model output was grouped into ${yearAgg}-year averages, and every ${coarsenFactor}×${coarsenFactor} block of grid cells was merged into one — ` +
-		`then the difference from the first time step was calculated to show the anomaly.`;
+	setStatus("");
 	window.cvegD3State = state;
 }
 
