@@ -11,7 +11,7 @@
 <body>
 	<main class="app">
 		<h1>How Do Different Climate Models Predict Changes in Global and Regional Vegetation Carbon Storage?</h1>
-		<p class="subtitle"><strong>Sweekrit Bhatnagar</strong> (sbhatnagar@ucsd.edu), <strong>Nirav Kanthed</strong> (nkanthed@ucsd.edu), and <strong>Arah Sanders</strong> (a4sanders@ucsd.edu)</p>
+		<p class="subtitle"><span class="author"><strong>Sweekrit Bhatnagar</strong> <span class="email">(sbhatnagar@ucsd.edu)</span></span>, <span class="author"><strong>Nirav Kanthed</strong> <span class="email">(nkanthed@ucsd.edu)</span></span>, and <span class="author"><strong>Arah Sanders</strong> <span class="email">(a4sanders@ucsd.edu)</span></span></p>
 		<p class="intro-text">
 			Plants absorb CO₂ from the atmosphere and store it as carbon in their biomass, a process directly related to the amount of carbon dioxide in the atmosphere and the climate conditions that they are exposed to. This visualization shows how vegetation carbon mass (measured in kilograms of carbon per square meter, kg C m⁻²) is projected to change from 2015 to 2100 under three different climate scenarios, using the BCC-CSM2-MR climate model from the CMIP6 project. Each map shows the anomaly, which represents how much carbon stored in plants has shifted compared to the 2015 baseline.
 
@@ -94,43 +94,38 @@
 
 		<section class="writeup-section">
 			<h2>Writeup</h2>
-			<p class="rationale">
-				Our primary goal for this project is to create an interactive visualization exploring the projected change of vegetation carbon mass (cVeg).
-				We have created three graphs to show the change of cVeg under three different scenarios (SSP2-4.5, SSP3-7.0, SSP5-8.5) from 2015 to 2100.
+			<div class="rationale">
+				<p>Our primary goal for this project is to create an interactive visualization exploring the projected change of vegetation carbon mass (cVeg). To this end, we have created three interactive maps and one line graph to show the change of cVeg under three different climate response scenarios (SSP2-4.5, SSP3-7.0, SSP5-8.5) from 2015 to 2100. Following is our design rationale.</p>
 
-				The interactive aspects of the visualization include a year slider that allows users to scrub through time and compare how different emission pathways lead to different outcomes across the globe.
-				We chose to use a year slider because it provides an intuitive way for users to explore the temporal dimension of the data and see how vegetation carbon storage evolves over time under different climate scenarios.
-				In comparison to a dropdown menu or buttons for specific years, a slider allows for smoother transitions and a more engaging user experience, enabling users to easily observe trends and patterns in the data.
-				We considered allowing controls for coarsening the data (merging neighboring grid cells) and aggregating the data into multi-year bins, which can help speed up rendering and provide a clearer picture of long-term trends. 
-				However, we ultimately decided against adding these controls to keep the interface simple and focused on the main interactive element (the year slider).
-				Users can also choose to focus on specific regions of the world using a dropdown menu, which updates the maps to show only the selected area.
-				This feature allows users to explore regional variations in vegetation carbon storage and understand how different parts of the world may be affected differently by climate change.
-				We considered using a world map with clickable regions to select focus areas, but ultimately decided on a dropdown menu for simplicity and ease of use, especially on smaller screens where clicking on specific regions might be more challenging.
+				<p><strong>In terms of interactive controls:</strong></p>
+				<ol>
+					<li>A slider for the year selection, allowing users to scrub through time and compare how different emission pathways lead to different outcomes across the globe. We chose to use a year slider because it provides an intuitive way for users to explore the temporal dimension of the data and see how vegetation carbon storage evolves over time under different climate scenarios. In comparison to a dropdown menu or buttons for specific years, a slider allows for smoother transitions and a more engaging user experience, enabling users to easily observe trends and patterns in the data.</li>
+					<li>We considered controls for coarsening the data (merging neighboring grid cells) and aggregating the data into custom multi-year bins. However, we ultimately decided against adding these controls to keep the interface simple and focused on the main interactive element (the year slider). We wanted to avoid overwhelming users with too many options and instead provide a clear and straightforward way to explore the data. Furthermore, recomputing the visualizations with user-selected coarsening and binning would require significant additional processing time and could lead to performance issues, especially since our default visualizations are already pre-computed for optimal performance.</li>
+					<li>We added a dropdown menu for users to select specific continents to focus on, which updates the maps and line graph accordingly. This feature allows users to explore regional variations in vegetation carbon storage and understand how different parts of the world may be affected differently by climate change. We considered using a world map with clickable regions to select focus areas, but ultimately decided on a dropdown menu for simplicity and ease of use, especially since coarse latitude and longitude squares make bordering regions difficult to distinguish.</li>
+					<li>To account for this lack of customization from the region dropdown, we added a brush tool to allow users to select specific regions of the map and see the corresponding data in the line graph. This feature enables users to explore localized trends and patterns in vegetation carbon storage, providing a more detailed understanding of how specific areas may be impacted by climate change.</li>
+					<li>In the line graph, users can click on specific points to jump to the corresponding year in the maps and also select a continent to focus on through the dropdown menu, which updates both the maps and the line graph to reflect the selected region. This adds consistency and interactivity between the different visualizations, allowing users to easily navigate between the global trends shown in the line graph and the spatial patterns shown in the maps.</li>
+				</ol>
 
-				The maps use a color scheme where green indicates more carbon stored in vegetation than in 2015 (beneficial for the climate), while red/brown indicates less carbon stored (detrimental for the climate). 
-				Blue areas represent oceans which lack data, and grey indicates no significant change from the baseline.
-				We chose green and red/brown to represent positive and negative changes in vegetation carbon storage because these colors are commonly associated with growth and decline, respectively, making it easier for users to quickly interpret the data.
-				We did not consider using other color schemes, as the green-red contrast is widely recognized and effective for conveying the intended message without overcomplicating the visualization.
+				<p><strong>In terms of graphs and visual encodings:</strong></p>
+				<ol>
+					<li>We chose a choropleth map to visualize the spatial distribution of vegetation carbon anomalies across pre-defined grid cells, as this type of map effectively conveys spatial patterns and variations in the data. Each grid cell is colored based on the magnitude of the anomaly from 2015, allowing users to easily identify areas of increase or decrease in vegetation carbon storage.</li>
+					<li>Our color scheme uses green to indicate areas where more carbon is stored in vegetation compared to 2015, while red indicates areas where less carbon was stored. This choice was made due to common associations of green with growth and health (as an increase in plant biomass is generally beneficial for pulling heightened CO2 levels from the atmosphere) and red with decline or danger (as a decrease in plant biomass can lead to more CO2 remaining in the atmosphere, further amplifying global warming). We considered other, more contrasting, color schemes, but decided against them due to the lack of association and effectiveness in conveying the intended message without cognitive overload. Additionally, we included blue to represent oceans where data is unavailable and yellow to indicate areas with no significant change from the baseline, providing clear visual cues for interpreting the maps.</li>
+					<li>We included a shared legend below the maps to explain the color encoding and provide the scale for the anomalies, ensuring that users are easily able to identify the meaning of the colors and the range of values represented.</li>
+					<li>We included a line graph showing the global mean carbon biomass in vegetation (cVeg) anomaly over time for each scenario to provide a clear representation of the overall trend for a region. This allows users to be able to quantify the change they see in the maps and understand numerically how much the vegetation carbon storage changes relative to the 2015 baseline in each scenario. We considered using a bar chart or scatter plot to show the global mean cVeg anomaly, but ultimately decided on a line graph because it effectively conveys trends over time and allows for easy comparison between scenarios.</li>
+				</ol>
 
-				We included a line graph showing the global mean cVeg anomaly over time for each scenario to provide a clear visual representation of how vegetation carbon storage is projected to change on a global scale under different emission pathways.
-				Users can interact with the line graph by clicking on it to jump to a specific year, which updates the maps above accordingly. 
-				Users can also change the region focus using the dropdown menu, which updates both the maps and the line graph to reflect the selected region.
-				This interactivity allows users to explore the relationship between global trends and regional changes in vegetation carbon storage, enhancing their understanding of the data and its implications for climate change.
-				It provides a more comprehensive view of the data, allowing users to see both the overall trends and the regional variations in vegetation carbon storage under different climate scenarios.
-				We considered using a bar chart or scatter plot to show the global mean cVeg anomaly, but ultimately decided on a line graph because it effectively conveys trends over time and allows for easy comparison between scenarios.
-			</p>
-			<p class="overview">
-				The team evenly split the work of this project, with each member taking responsibility for different aspects of the visualization and writeup.
-				Sweekrit focused on data processing, map rendering, and implementing the interactive controls. 
-				Sweekrit spent around 6-7 hours. 
-				Majority of it was spent reading through the data information and figuring out how to most efficiently get the information from it, followed by creating the initial visualizations for the maps over time.
-				Nirav worked on improving the webpage data loading performance and providing more detailed graph annotations.
-				Nirav spent around 3-4 hours on the project, with the majority of time spent on optimizing data loading and rendering performance, as well as adding detailed annotations to the graphs to enhance user understanding of the data.
-				Arah contributed to the writeup and finalizing the website. 
-				Arah spent roughly around 2-3 hours on the project, with the majority of time spent on writing the rationale and overview sections of the writeup, as well as proofreading and editing the final content for clarity and coherence.
-				The team collaborated closely throughout the project, regularly sharing updates and providing feedback to ensure a cohesive and polished final product.
-				All aspects of the project were thoroughly discussed and agreed upon by the team, with each member contributing idaeas and suggestions throughout the project.
-			</p>
+				<p>Overall, our design choices were guided by the goal of creating an engaging and informative visualization that allows users to examine spatial and temporal trends in vegetation carbon storage under different climate scenarios, while keeping the interface intuitive and focused on the key interactive elements.</p>
+			</div>
+			<div class="overview">
+				<p>The team evenly split the work of this project, with each member taking responsibility for different aspects of the visualization and writeup:</p>
+				<ol>
+					<li><strong>Sweekrit</strong> focused on the initial data processing, including downloading the data from the CMIP6 archive, calculating anomalies, and preparing the data for visualization. Sweekrit also took the lead on rendering the maps and implementing the interactive controls for the year slider and region selection. This involved writing code to efficiently load and process the data, as well as creating the visualizations using D3.js. He spent about 6-7 hours on these tasks, with the majority of time spent reading through the data documentation and figuring out how to most efficiently extract and process the relevant information, followed by creating the initial visualizations for the maps over time.</li>
+					<li><strong>Nirav</strong> worked on improving the webpage data loading performance and providing more detailed graph annotations. This involved optimizing the data loading and rendering processes to ensure that the visualizations were responsive and efficient, especially with the large dataset that we were dealing with. Nirav also added detailed titles, subtitles, and annotations to the graphs to enhance user understanding of the data He spent around 3-4 hours on these tasks, with the majority of time spent on optimizing performance and adding detailed annotations to enhance the clarity and informativeness of the visualizations.</li>
+					<li><strong>Arah</strong> contributed to the writeup and finalization of the website. This involved writing the rationale and overview sections, proofreading and editing the content and visualizations for clarity and coherence, and ensuring the the presentation of the final product was polished, professional, and easy to understand. Arah spent roughly around 2-3 hours on these tasks, with the majority of time spent on writing the rationale and overview sections of the writeup.</li>
+				</ol>
+			
+				<p>Throughout the project, the team collaborated closely, regularly sharing updates and providing feedback to ensure a cohesive and polished final product. All aspects of the project were thoroughly discussed and agreed upon by the team, with each member contributing ideas and suggestions throughout the project.</p>
+			</div>
 		</section>
 	</main>
 

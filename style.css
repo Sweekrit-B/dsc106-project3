@@ -42,7 +42,24 @@ h1 {
 
 .subtitle {
 	color: var(--muted);
-	margin: 0.35rem 0 0.8rem;
+	margin: 0.5rem 0 0.95rem;
+	padding: 0.6rem 0.75rem;
+	border: 1px solid #e2ddd1;
+	border-radius: 10px;
+	background: linear-gradient(180deg, #fffefb 0%, #f8f4eb 100%);
+	font-size: 0.9rem;
+	line-height: 1.55;
+}
+
+.subtitle .author strong {
+	color: #1f3f49;
+	font-weight: 700;
+}
+
+.subtitle .email {
+	font-family: "Consolas", "Courier New", monospace;
+	font-size: 0.84rem;
+	color: #4f6670;
 }
 
 .intro-text {
@@ -380,6 +397,29 @@ h1 {
 	font-size: 1.1rem;
 }
 
+.rationale,
+.overview {
+	line-height: 1.65;
+	color: #2a3338;
+}
+
+.rationale p,
+.overview p {
+	margin: 0 0 0.8rem;
+}
+
+.rationale ol,
+.overview ol {
+	margin: 0.35rem 0 1rem;
+	padding-left: 1.35rem;
+}
+
+.rationale li,
+.overview li {
+	margin: 0 0 0.5rem;
+	padding-left: 0.2rem;
+}
+
 .writeup-placeholder {
 	color: #aaa;
 	font-style: italic;
@@ -419,5 +459,9 @@ h1 {
 
 	.map-grid {
 		grid-template-columns: 1fr;
+	}
+
+	.subtitle {
+		font-size: 0.85rem;
 	}
 }
